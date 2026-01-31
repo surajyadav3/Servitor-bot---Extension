@@ -1,10 +1,28 @@
 document.addEventListener('DOMContentLoaded', () => {
     const toggleBtn = document.getElementById('toggle-btn');
     const statusText = document.getElementById('status-text');
-    const minimizeBtn = document.getElementById('minimize-btn');
+
     const transcriptDiv = document.getElementById('transcript');
     const body = document.body;
     const btnIcon = document.getElementById('btn-icon');
+    const helpBtn = document.getElementById('help-btn');
+    const helpOverlay = document.getElementById('help-overlay');
+    const closeHelp = document.getElementById('close-help');
+
+    // Help Logic
+    helpBtn.addEventListener('click', () => {
+        helpOverlay.classList.add('open');
+    });
+
+    closeHelp.addEventListener('click', () => {
+        helpOverlay.classList.remove('open');
+    });
+
+    helpOverlay.addEventListener('click', (e) => {
+        if (e.target === helpOverlay) {
+            helpOverlay.classList.remove('open');
+        }
+    });
 
     let recognition;
     let isListening = false;
@@ -58,22 +76,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // Live Transcript Handling
+            let liveP = document.getElementById('live-transcript');
             if (interimTranscript) {
-                statusText.innerText = interimTranscript;
+                if (!liveP) {
+                    liveP = document.createElement('p');
+                    liveP.id = 'live-transcript';
+                    liveP.style.opacity = '0.7';
+                    transcriptDiv.appendChild(liveP);
+                }
+                liveP.innerText = `... ${interimTranscript}`;
+                transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+
+                // TURBO MODE: Instant execution
+                const lowerInterim = interimTranscript.toLowerCase().trim();
+                if (lowerInterim.includes('scroll') || lowerInterim.includes('page') || lowerInterim.includes('go back') || lowerInterim.includes('refresh')) {
+                    if (!window.lastTurbo || (Date.now() - window.lastTurbo > 800)) {
+                        const quickCmd = smartCorrect(lowerInterim);
+                        if (processCommand(quickCmd, true)) {
+                            window.lastTurbo = Date.now();
+                            const orb = document.querySelector('.orb');
+                            orb.style.background = 'radial-gradient(circle at 30% 30%, #fff, var(--primary-color))';
+                            setTimeout(() => { orb.style.background = ''; }, 200);
+                        }
+                    }
+                }
             }
 
             if (finalTranscript) {
-                let cmd = finalTranscript.trim();
+                // Remove live placeholder
+                if (liveP) liveP.remove();
 
-                // Smart Autocorrect ("Learning" logic)
+                let cmd = finalTranscript.trim();
                 cmd = smartCorrect(cmd);
 
                 logTranscript(`🎤 ${cmd}`);
-                statusText.innerText = "✓ " + cmd;
                 processCommand(cmd);
-                setTimeout(() => {
-                    if (isListening) statusText.innerText = "Listening...";
-                }, 2000);
+
+                // Keep status text simple
+                if (isListening) statusText.innerText = "Listening...";
             }
         };
 
@@ -135,33 +176,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    minimizeBtn.addEventListener('click', () => {
+    function toggleMinimize() {
         isMinimized = !isMinimized;
         body.classList.toggle('minimized', isMinimized);
-        minimizeBtn.innerText = isMinimized ? '➕' : '➖';
-    });
+    }
 
 
-    function processCommand(cmd) {
+    function processCommand(cmd, isTurbo = false) {
         const command = cmd.toLowerCase();
 
         // 0. TAB MANAGEMENT (Check FIRST to prevent "open new tab" from triggering search)
         if (command.includes('new tab') || command === 'open new tab' || command === 'open a new tab') {
             logTranscript(`🤖 Opening new tab...`);
             chrome.tabs.create({});
-            return;
+            return true;
         }
 
         if (command.includes('close tab') || command.includes('close current tab') || command.includes('close this tab')) {
+            // Turbo safety: don't close tabs on interim result unless very sure (skip for now)
+            if (isTurbo) return false;
             logTranscript(`🤖 Closing current tab...`);
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.remove(tabs[0].id);
             });
-            return;
+            return true;
         }
 
         // 0.5 SEARCH WITHIN CURRENT TAB (search here, search this page)
         if (command.includes('search here') || command.includes('search this') || command.includes('type ')) {
+            if (isTurbo) return false; // Don't type partially
             let query = command
                 .replace('search here for', '')
                 .replace('search here', '')
@@ -188,11 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
-            return;
+            return true;
         }
 
         // 1. OPEN COMMANDS (after tab commands)
         if (command.startsWith('open ')) {
+            if (isTurbo) return false; // Open can wait
+
             const target = command.replace('open', '').trim();
 
             // Skip if it's just "open" with nothing useful
@@ -210,18 +255,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 'facebook': 'https://facebook.com',
                 'twitter': 'https://twitter.com',
                 'chatgpt': 'https://chat.openai.com',
-                'netflix': 'https://netflix.com',
-                'amazon': 'https://amazon.com',
-                'linkedin': 'https://linkedin.com'
+                'netflix': 'https://www.netflix.com',
+                'amazon': 'https://www.amazon.com',
+                'linkedin': 'https://www.linkedin.com',
+                'prime': 'https://www.primevideo.com',
+                'prime video': 'https://www.primevideo.com',
+                'hotstar': 'https://www.hotstar.com',
+                'disney plus': 'https://www.hotstar.com',
+                'hulu': 'https://www.hulu.com',
+                'spotify': 'https://open.spotify.com'
             };
 
             let url = sites[target] || `https://www.google.com/search?q=${encodeURIComponent(target)}`;
             chrome.tabs.create({ url });
-            return;
+            return true;
         }
 
         // 2. PLAY COMMANDS (YouTube Search + Auto-play)
         if (command.includes('play ')) {
+            if (isTurbo) return false;
             let song = command.split('play')[1].replace('on youtube', '').trim();
             if (song) {
                 logTranscript(`🤖 Playing "${song}" on YouTube...`);
@@ -237,11 +289,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     chrome.tabs.onUpdated.addListener(listener);
                 });
             }
-            return;
+            return true;
         }
 
         // 3. ENHANCED SEARCH COMMANDS (Site Specific)
         if (command.includes('search ')) {
+            if (isTurbo) return false;
             let site = '';
             let query = '';
 
@@ -268,15 +321,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     flipkart: `https://www.flipkart.com/search?q=${encodeURIComponent(query)}`
                 };
                 chrome.tabs.create({ url: urls[site] });
-                return;
+                return true;
             }
 
             // Default Google search
             const searchQuery = command.replace('search', '').trim();
             logTranscript(`🤖 Searching for "${searchQuery}"...`);
             chrome.tabs.create({ url: `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}` });
-            return;
+            return true;
         }
+
 
 
         // 4. NAVIGATION (refresh, back, forward)
@@ -285,22 +339,22 @@ document.addEventListener('DOMContentLoaded', () => {
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.reload(tabs[0].id);
             });
-            return;
+            return true;
         }
 
         if (command.includes('go back')) {
-            logTranscript(`🤖 Going back...`);
+            if (!isTurbo) logTranscript(`🤖 Going back...`); // Don't spam log in turbo
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.goBack(tabs[0].id);
             });
-            return;
+            return true;
         }
 
         if (command.includes('go forward')) {
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.goForward(tabs[0].id);
             });
-            return;
+            return true;
         }
 
         // 4.5 SCROLL COMMANDS
@@ -308,28 +362,28 @@ document.addEventListener('DOMContentLoaded', () => {
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: "scroll", direction: "down" });
             });
-            return;
+            return true;
         }
 
         if (command.includes('scroll up') || command.includes('page up')) {
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: "scroll", direction: "up" });
             });
-            return;
+            return true;
         }
 
         if (command.includes('scroll to top') || command.includes('go to top') || command === 'top') {
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: "scroll", direction: "top" });
             });
-            return;
+            return true;
         }
 
         if (command.includes('scroll to bottom') || command.includes('go to bottom') || command === 'bottom') {
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: "scroll", direction: "bottom" });
             });
-            return;
+            return true;
         }
 
         // 5. SITE SPECIFIC SEARCH (Direct)
