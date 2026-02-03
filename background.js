@@ -3,5 +3,5 @@ chrome.sidePanel
   .catch((error) => console.error(error));
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("Voice Commander installed.");
+  console.log("Servitor Bot installed.");
 });
