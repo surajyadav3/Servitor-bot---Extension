@@ -116,10 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 body.classList.add('listening');
                 toggleBtn.classList.add('active');
                 statusText.innerText = "Listening...";
-                btnIcon.innerText = '⏹️';
+                btnIcon.src = 'icons/stop.svg';
             } else {
                 statusText.innerText = "Sleeping...";
-                btnIcon.innerText = '💤';
+                btnIcon.src = 'icons/mic.svg'; // Keep mic when sleeping
+                body.classList.add('sleeping');
             }
         };
 
@@ -128,9 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 recognition.start();
             } else {
                 body.classList.remove('listening');
+                body.classList.remove('sleeping');
                 toggleBtn.classList.remove('active');
                 statusText.innerText = "Tap to start";
-                btnIcon.innerText = '🎙️';
+                btnIcon.src = 'icons/mic.svg';
             }
         };
 
@@ -178,8 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (processCommand(quickCmd, true)) {
                             window.lastTurbo = Date.now();
                             const orb = document.querySelector('.orb');
-                            orb.style.background = 'radial-gradient(circle at 30% 30%, #fff, var(--primary-color))';
-                            setTimeout(() => { orb.style.background = ''; }, 200);
+                            if (orb) {
+                                orb.style.background = 'radial-gradient(circle at 30% 30%, #fff, var(--primary-color))';
+                                setTimeout(() => { orb.style.background = ''; }, 200);
+                            }
                         }
                     }
                 }
@@ -199,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         body.classList.add('listening');
                         toggleBtn.classList.add('active');
                         statusText.innerText = "Listening...";
-                        btnIcon.innerText = '⏹️';
+                        btnIcon.src = 'icons/stop.svg';
                         logTranscript("⚡ I'm awake!");
                         return;
                     }
@@ -212,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body.classList.remove('listening');
                     toggleBtn.classList.remove('active'); // Visually look inactive
                     statusText.innerText = "Sleeping (Say 'Wake up')";
-                    btnIcon.innerText = '💤';
+                    btnIcon.src = 'icons/mic.svg'; // Use mic icon for sleep state
                     logTranscript("💤 Going to sleep...");
                     return;
                 }
@@ -514,6 +518,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     }
+    // 3D Tilt Effect
+    const container = document.querySelector('.container');
+    document.addEventListener('mousemove', (e) => {
+        if (isMinimized) return; // Don't tilt if minimized
+
+        let x = (window.innerWidth / 2 - e.clientX) / 20;
+        let y = (window.innerHeight / 2 - e.clientY) / 20;
+
+        container.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+    });
+
+    document.addEventListener('mouseleave', () => {
+        container.style.transform = `rotateY(0deg) rotateX(0deg)`;
+        container.style.transition = 'transform 0.5s ease';
+    });
+
+    document.addEventListener('mouseenter', () => {
+        container.style.transition = 'none';
+    });
+
 });
 
 

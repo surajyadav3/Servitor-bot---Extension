@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Servitor Bot</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <div class="header">
+    <button id="help-btn" class="help-btn" title="Commands">?</button>
+  </div>
+
+  <!-- Help Overlay -->
+  <div id="help-overlay" class="help-overlay">
+    <div class="help-content">
+      <div class="help-header">
+        <h2>Voice Commands</h2>
+        <button id="close-help">×</button>
+      </div>
+      <div class="command-list">
+
+        <div class="cmd-group">
+          <h3>Apps & Streaming</h3>
+          <p><span>Open</span> "Netflix, Spotify, Gmail..."</p>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Navigation</h3>
+          <p><span>Scroll</span> "Down, Up, Top, Bottom"</p>
+          <p><span>Tabs</span> "New tab, Close tab"</p>
+          <p><span>History</span> "Back, Forward, Refresh"</p>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Smart Search</h3>
+          <p><span>Google</span> "Search [query]"</p>
+          <p><span>YouTube</span> "Play [song] on YouTube"</p>
+          <p><span>Page</span> "Search here for [text]"</p>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Control</h3>
+          <p><span>Sleep</span> "Stop listening"</p>
+          <p><span>Wake</span> "Wake up"</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <div class="mic-container">
+      <button id="toggle-btn" class="mic-btn">
+        <span id="btn-icon">🎙️</span>
+      </button>
+      <div class="ring"></div>
+    </div>
+
+    <p class="status" id="status-text">Tap to start</p>
+
+    <div id="transcript" class="transcript"></div>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+
+</html>
