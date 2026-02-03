@@ -4,6 +4,7 @@
     "version": "1.0",
     "description": "Control your browser and play music on YouTube using voice commands.",
     "permissions": [
+        "sidePanel",
         "tabs",
         "scripting",
         "activeTab"
@@ -12,14 +13,15 @@
         "service_worker": "background.js"
     },
     "action": {
-        "default_title": "Open Servitor Bot",
-        "default_popup": "popup.html"
+        "default_title": "Open Servitor Bot"
+    },
+    "side_panel": {
+        "default_path": "sidepanel.html"
     },
     "content_scripts": [
         {
             "matches": [
-                "*://www.youtube.com/*",
-                "*://www.google.com/*"
+                "<all_urls>"
             ],
             "js": [
                 "content.js"
