@@ -1,0 +1,20 @@
+HOW TO INSTALL SERVITOR BOT (FREE METHOD)
+=========================================
+
+Since this extension is not on the Chrome Web Store, you can install it manually for free using "Developer Mode".
+
+INSTRUCTIONS:
+1.  Unzip this "ServitorBot_Package" folder to a safe place on your computer (don't delete it later!).
+2.  Open Google Chrome.
+3.  In the address bar, type: chrome://extensions  and hit Enter.
+4.  In the top-right corner, turn ON the switch for "Developer mode".
+5.  Click the "Load unpacked" button that appears in the top-left.
+6.  Select the folder where you unzipped these files.
+
+That's it! The "Servitor Bot" icon should appear in your toolbar.
+
+TROUBLESHOOTING:
+- If Chrome asks to "Disable developer mode extensions" on restart, just click "Keep changes" or "Cancel". This is normal for manual installations.
+- Make sure your microphone permission is allowed when you first use it.
+
+Enjoy your AI Assistant!

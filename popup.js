@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let recognition;
     let isListening = false;
+    let isSleeping = false; // New state for "wake word" mode
     let isMinimized = false;
 
     function logTranscript(text) {
@@ -39,6 +40,70 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    const sites = {
+        'youtube': 'https://www.youtube.com',
+        'google': 'https://www.google.com',
+        'gmail': 'https://mail.google.com',
+        'github': 'https://github.com',
+        'facebook': 'https://facebook.com',
+        'twitter': 'https://twitter.com',
+        'chatgpt': 'https://chat.openai.com',
+        'netflix': 'https://www.netflix.com',
+        'amazon': 'https://www.amazon.com',
+        'linkedin': 'https://www.linkedin.com',
+        'prime': 'https://www.primevideo.com',
+        'prime video': 'https://www.primevideo.com',
+        'hotstar': 'https://www.hotstar.com',
+        'disney plus': 'https://www.hotstar.com',
+        'hulu': 'https://www.hulu.com',
+        'spotify': 'https://open.spotify.com'
+    };
+
+    function extractLatestCommand(input) {
+        let text = input.trim();
+
+        // 1. Handle Corrections (Split by "no", "wait", "actually")
+        const indicators = [' no ', ' wait ', ' actually ', ' cancel ', ' instead ', ' stop '];
+        for (const word of indicators) {
+            if (text.includes(word)) {
+                const parts = text.split(word);
+                text = parts[parts.length - 1].trim();
+            }
+        }
+
+        // 2. Identify the LATEST command start
+        const siteKeys = Object.keys(sites).join('|');
+
+        // Patterns to detect command starts
+        const commandPatterns = [
+            { regex: new RegExp(`\\bopen\\s+(${siteKeys}|new tab)\\b`, 'i'), type: 'open_safe' },
+            { regex: /\b(close\s+tab|close\s+this\s+tab)\b/i, type: 'close_tab' },
+            { regex: /\b(scroll|page)\s+(up|down|top|bottom)\b/i, type: 'scroll' },
+            { regex: /\b(go\s+back|go\s+forward|refresh|reload)\b/i, type: 'nav' },
+            { regex: /\bplay\s+/i, type: 'play' },
+            { regex: /\bsearch\s+/i, type: 'search' },
+            { regex: /\btype\s+/i, type: 'type' }
+        ];
+
+        let bestIndex = -1;
+
+        commandPatterns.forEach(p => {
+            const globalRegex = new RegExp(p.regex, 'gi');
+            let match;
+            while ((match = globalRegex.exec(text)) !== null) {
+                if (match.index > bestIndex) {
+                    bestIndex = match.index;
+                }
+            }
+        });
+
+        if (bestIndex > 0) {
+            return text.substring(bestIndex).trim();
+        }
+
+        return text;
+    }
+
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
         recognition.continuous = true;
@@ -47,10 +112,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         recognition.onstart = () => {
             isListening = true;
-            body.classList.add('listening');
-            toggleBtn.classList.add('active');
-            statusText.innerText = "Listening...";
-            btnIcon.innerText = '⏹️';
+            if (!isSleeping) {
+                body.classList.add('listening');
+                toggleBtn.classList.add('active');
+                statusText.innerText = "Listening...";
+                btnIcon.innerText = '⏹️';
+            } else {
+                statusText.innerText = "Sleeping...";
+                btnIcon.innerText = '💤';
+            }
         };
 
         recognition.onend = () => {
@@ -90,9 +160,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // TURBO MODE: Instant execution
                 const lowerInterim = interimTranscript.toLowerCase().trim();
+
+                // sleep mode check (only wake up)
+                if (isSleeping) {
+                    if (lowerInterim.includes('wake up') || lowerInterim.includes('start listening') || lowerInterim.includes('wake up bot')) {
+                        // Wake up immediately on interim? Maybe safer to wait for final to avoid accidents, 
+                        // but for "wake up" speed is nice. Let's wait for final to be robust.
+                    }
+                    return; // Ignore other turbo commands while sleeping
+                }
+
                 if (lowerInterim.includes('scroll') || lowerInterim.includes('page') || lowerInterim.includes('go back') || lowerInterim.includes('refresh')) {
                     if (!window.lastTurbo || (Date.now() - window.lastTurbo > 800)) {
-                        const quickCmd = smartCorrect(lowerInterim);
+                        let quickCmd = smartCorrect(lowerInterim);
+                        quickCmd = extractLatestCommand(quickCmd);
+
                         if (processCommand(quickCmd, true)) {
                             window.lastTurbo = Date.now();
                             const orb = document.querySelector('.orb');
@@ -110,11 +192,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 let cmd = finalTranscript.trim();
                 cmd = smartCorrect(cmd);
 
-                logTranscript(`🎤 ${cmd}`);
+                // Check for Wake/Sleep commands specially
+                if (isSleeping) {
+                    if (cmd.includes('wake up') || cmd.includes('start listening') || cmd.includes('hey bot')) {
+                        isSleeping = false;
+                        body.classList.add('listening');
+                        toggleBtn.classList.add('active');
+                        statusText.innerText = "Listening...";
+                        btnIcon.innerText = '⏹️';
+                        logTranscript("⚡ I'm awake!");
+                        return;
+                    }
+                    // Stay sleeping, ignore everything else
+                    return;
+                }
+
+                if (cmd.includes('stop listening') || cmd.includes('go to sleep') || cmd.includes('pause listening')) {
+                    isSleeping = true;
+                    body.classList.remove('listening');
+                    toggleBtn.classList.remove('active'); // Visually look inactive
+                    statusText.innerText = "Sleeping (Say 'Wake up')";
+                    btnIcon.innerText = '💤';
+                    logTranscript("💤 Going to sleep...");
+                    return;
+                }
+
+                // Intelligently extract latest command
+                const originalCmd = cmd;
+                cmd = extractLatestCommand(cmd);
+
+                if (cmd !== originalCmd) {
+                    logTranscript(`🎤 Heard: "${originalCmd}"`);
+                    logTranscript(`⚡ Executing: "${cmd}"`);
+                } else {
+                    logTranscript(`🎤 ${cmd}`);
+                }
+
                 processCommand(cmd);
 
                 // Keep status text simple
-                if (isListening) statusText.innerText = "Listening...";
+                if (isListening && !isSleeping) statusText.innerText = "Listening...";
             }
         };
 
@@ -234,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return true;
         }
 
+
         // 1. OPEN COMMANDS (after tab commands)
         if (command.startsWith('open ')) {
             if (isTurbo) return false; // Open can wait
@@ -247,25 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             logTranscript(`🤖 Opening ${target}...`);
 
-            const sites = {
-                'youtube': 'https://www.youtube.com',
-                'google': 'https://www.google.com',
-                'gmail': 'https://mail.google.com',
-                'github': 'https://github.com',
-                'facebook': 'https://facebook.com',
-                'twitter': 'https://twitter.com',
-                'chatgpt': 'https://chat.openai.com',
-                'netflix': 'https://www.netflix.com',
-                'amazon': 'https://www.amazon.com',
-                'linkedin': 'https://www.linkedin.com',
-                'prime': 'https://www.primevideo.com',
-                'prime video': 'https://www.primevideo.com',
-                'hotstar': 'https://www.hotstar.com',
-                'disney plus': 'https://www.hotstar.com',
-                'hulu': 'https://www.hulu.com',
-                'spotify': 'https://open.spotify.com'
-            };
-
             let url = sites[target] || `https://www.google.com/search?q=${encodeURIComponent(target)}`;
             chrome.tabs.create({ url });
             return true;
@@ -278,6 +377,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (song) {
                 logTranscript(`🤖 Playing "${song}" on YouTube...`);
                 const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(song)}`;
+
+                // Stop listening so the video audio doesn't interfere
+                if (isListening) {
+                    isListening = false;
+                    recognition.stop();
+                    logTranscript("🤖 Stopped listening for playback.");
+                }
+
                 chrome.tabs.create({ url: searchUrl }, (tab) => {
                     const listener = (tabId, changeInfo) => {
                         if (tabId === tab.id && changeInfo.status === 'complete') {
@@ -405,16 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // 6. UI CONTROL
-        if (command.includes('hide interface') || command.includes('hide assistant') || command.includes('minimize')) {
-            if (!isMinimized) toggleMinimize();
-            return;
-        }
 
-        if (command.includes('show interface') || command.includes('show assistant') || command.includes('maximize')) {
-            if (isMinimized) toggleMinimize();
-            return;
-        }
     }
 });
 
